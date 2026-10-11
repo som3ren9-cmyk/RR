@@ -30,11 +30,17 @@ jobs:
           Add-LocalGroupMember -Group "Administrators" -Member $Username
           Add-LocalGroupMember -Group "Remote Desktop Users" -Member $Username
 
-      - name: Install Tailscale
+      - name: Download and Install Tailscale
         run: |
-          winget install Tailscale.Tailscale --silent --accept-package-agreements --accept-source-agreements
+          Write-Host "Downloading Tailscale installer..."
+          $installerPath = "$env:TEMP\tailscale-setup.exe"
+          Invoke-WebRequest -Uri "https://pkgs.tailscale.com/stable/tailscale-setup-latest.exe" -OutFile $installerPath
 
-      - name: Connect to Tailscale
+          Write-Host "Installing Tailscale silently..."
+          Start-Process -FilePath $installerPath -ArgumentList "/quiet", "/norestart" -Wait
+          Remove-Item $installerPath -Force
+
+      - name: Connect to Tailscale Network
         run: |
           & "$env:ProgramFiles\Tailscale\tailscale.exe" up --authkey=${{ secrets.TAILSCALE_AUTH_KEY }} --hostname=win10-vps-$env:GITHUB_RUN_ID
 
@@ -47,20 +53,20 @@ jobs:
           }
 
           if (-not $tailscaleIP) {
-              Write-Error "Failed to get Tailscale IP."
+              Write-Error "Failed to obtain Tailscale IP address."
               exit 1
           }
 
           echo "TAILSCALE_IP=$tailscaleIP" >> $env:GITHUB_ENV
 
-      - name: Display Connection Info and Keep Alive
+      - name: Display Details and Keep Alive
         run: |
           Write-Host "========================================================"
           Write-Host "Windows VPS is ready for Remote Desktop connection."
-          Write-Host "RDP IP Address : $env:TAILSCALE_IP"
-          Write-Host "Username       : VPSAdmin"
-          Write-Host "Password       : WindowsVPS@2026#Pass"
-          Write-Host "Port           : 3389"
+          Write-Host "RDP Address : $env:TAILSCALE_IP"
+          Write-Host "Username    : VPSAdmin"
+          Write-Host "Password    : WindowsVPS@2026#Pass"
+          Write-Host "Port        : 3389"
           Write-Host "========================================================"
 
           while ($true) {
