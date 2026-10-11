@@ -9,23 +9,14 @@ jobs:
     timeout-minutes: 360
 
     steps:
-      - name: Verify Europe Datacenter Location
+      - name: Check Runner Geolocation
         run: |
           Write-Host "Checking runner geolocation..."
           $geo = Invoke-RestMethod -Uri "https://ipinfo.io/json"
           Write-Host "Runner IP       : $($geo.ip)"
           Write-Host "Runner Country  : $($geo.country)"
           Write-Host "Runner City     : $($geo.city)"
-
-          # List of European countries common in Azure datacenters
-          $europeCountries = @("NL", "IE", "FR", "DE", "GB", "ES", "IT", "BE", "SE", "PL", "CH", "AT", "NO", "FI")
-
-          if ($geo.country -notin $europeCountries) {
-              Write-Error "The assigned runner is NOT located in Europe (Current country: $($geo.country)). Cancelling execution..."
-              exit 1
-          }
-
-          Write-Host "Location confirmed: The runner is active in Europe ($($geo.country)). Proceeding..."
+          Write-Host "Location note: continuing without a Europe-only restriction because GitHub-hosted runners are not guaranteed to be in Europe."
 
       - name: Configure Remote Desktop Settings
         run: |
@@ -89,6 +80,6 @@ jobs:
           Write-Host "========================================================"
 
           while ($true) {
-              Write-Host "[$(Get-Date)] woobbie running active in Europe..."
+              Write-Host "[$(Get-Date)] woobbie running active..."
               Start-Sleep -Seconds 300
           }
