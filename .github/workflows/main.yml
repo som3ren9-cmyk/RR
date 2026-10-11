@@ -1,0 +1,52 @@
+name: woobbie
+
+on:
+  workflow_dispatch:
+
+jobs:
+  launch-woobbie:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+
+    steps:
+      - name: Install and Connect Tailscale
+        uses: tailscale/github-action@v2
+        with:
+          authkey: ${{ secrets.TAILSCALE_AUTH_KEY }}
+          args: --ssh --hostname=woobbie-${{ github.run_id }}
+
+      - name: Launch Pure Debian 12 Environment
+        run: |
+          # Start a Debian 12 (Bookworm) container named woobbie
+          docker run -d --name woobbie --privileged --net=host debian:bookworm sleep infinity
+
+          # Install base system utilities inside woobbie
+          docker exec woobbie apt-get update
+          docker exec woobbie apt-get install -y curl wget sudo nano htop git
+
+          # Redirect incoming SSH sessions directly into the woobbie environment
+          echo '#!/bin/bash' | sudo tee /usr/local/bin/enter-woobbie
+          echo 'exec docker exec -it woobbie bash' | sudo tee -a /usr/local/bin/enter-woobbie
+          sudo chmod +x /usr/local/bin/enter-woobbie
+          sudo chsh -s /usr/local/bin/enter-woobbie runner
+
+      - name: Display Connection Details and Keep Alive
+        run: |
+          TS_IP=$(tailscale ip -4)
+          echo "======================================================"
+          echo "Server 'woobbie' is active."
+          echo "Tailscale IP : $TS_IP"
+          echo "Hostname     : woobbie-${{ github.run_id }}"
+          echo "User         : runner"
+          echo ""
+          echo "Connect from your terminal using:"
+          echo "ssh runner@$TS_IP"
+          echo "or:"
+          echo "ssh runner@woobbie-${{ github.run_id }}"
+          echo "======================================================"
+
+          # Keep the session running
+          while [ true ]; do
+            echo "[$(date)] woobbie is running active..."
+            sleep 300
+          done
