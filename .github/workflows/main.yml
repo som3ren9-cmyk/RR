@@ -1,53 +1,69 @@
-name: woobbie
+name: Windows-10-VPS
 
 on:
   workflow_dispatch:
 
 jobs:
-  launch-woobbie:
-    runs-on: ubuntu-latest
+  launch-windows:
+    runs-on: windows-2022
     timeout-minutes: 360
 
     steps:
-      - name: Configure SSH Password Access
+      - name: Configure Remote Desktop Settings
         run: |
-          # Set password for runner
-          echo "runner:Admin@1234" | sudo chpasswd
-          echo "root:Admin@1234" | sudo chpasswd
+          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name "fDenyTSConnections" -Value 0 -Force
+          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name "UserAuthentication" -Value 0 -Force
+          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name "SecurityLayer" -Value 0 -Force
 
-          # Force OpenSSH to allow password login
-          sudo sed -i 's/^#\?PasswordAuthentication .*/PasswordAuthentication yes/' /etc/ssh/sshd_config
-          sudo sed -i 's/^#\?KbdInteractiveAuthentication .*/KbdInteractiveAuthentication yes/' /etc/ssh/sshd_config
-          sudo systemctl restart ssh
+          netsh advfirewall firewall delete rule name="RDP-Port" 2>$null
+          netsh advfirewall firewall add rule name="RDP-Port" dir=in action=allow protocol=TCP localport=3389
 
-      - name: Install and Connect Tailscale
-        uses: tailscale/github-action@v2
-        with:
-          authkey: ${{ secrets.TAILSCALE_AUTH_KEY }}
-          args: --hostname=woobbie-${{ github.run_id }}
+          Restart-Service -Name TermService -Force
 
-      - name: Launch Debian Environment
+      - name: Create Administrator Account
         run: |
-          mkdir -p /home/runner/workspace
-          sudo chown -R runner:runner /home/runner/workspace
-          docker run -d --name woobbie --privileged --net=host -v /home/runner/workspace:/workspace debian:bookworm sleep infinity
+          $Username = "VPSAdmin"
+          $PlainPassword = "WindowsVPS@2026#Pass"
+          $SecurePassword = ConvertTo-SecureString $PlainPassword -AsPlainText -Force
 
-          docker exec woobbie apt-get update
-          docker exec woobbie apt-get install -y curl wget sudo nano htop git
-          echo "alias debian='docker exec -it woobbie bash'" >> /home/runner/.bashrc
+          New-LocalUser -Name $Username -Password $SecurePassword -AccountNeverExpires
+          Add-LocalGroupMember -Group "Administrators" -Member $Username
+          Add-LocalGroupMember -Group "Remote Desktop Users" -Member $Username
 
-      - name: Display Connection Details and Keep Alive
+      - name: Install Tailscale
         run: |
-          TS_IP=$(tailscale ip -4)
-          echo "======================================================"
-          echo "Server 'woobbie' is ready."
-          echo "Tailscale IP : $TS_IP"
-          echo "Username     : runner"
-          echo "Password     : Admin@1234"
-          echo "Port         : 22"
-          echo "======================================================"
+          winget install Tailscale.Tailscale --silent --accept-package-agreements --accept-source-agreements
 
-          while [ true ]; do
-            echo "[$(date)] woobbie running active..."
-            sleep 300
-          done
+      - name: Connect to Tailscale
+        run: |
+          & "$env:ProgramFiles\Tailscale\tailscale.exe" up --authkey=${{ secrets.TAILSCALE_AUTH_KEY }} --hostname=win10-vps-$env:GITHUB_RUN_ID
+
+          $tailscaleIP = $null
+          $retries = 0
+          while (-not $tailscaleIP -and $retries -lt 12) {
+              $tailscaleIP = & "$env:ProgramFiles\Tailscale\tailscale.exe" ip -4
+              Start-Sleep -Seconds 5
+              $retries++
+          }
+
+          if (-not $tailscaleIP) {
+              Write-Error "Failed to get Tailscale IP."
+              exit 1
+          }
+
+          echo "TAILSCALE_IP=$tailscaleIP" >> $env:GITHUB_ENV
+
+      - name: Display Connection Info and Keep Alive
+        run: |
+          Write-Host "========================================================"
+          Write-Host "Windows VPS is ready for Remote Desktop connection."
+          Write-Host "RDP IP Address : $env:TAILSCALE_IP"
+          Write-Host "Username       : VPSAdmin"
+          Write-Host "Password       : WindowsVPS@2026#Pass"
+          Write-Host "Port           : 3389"
+          Write-Host "========================================================"
+
+          while ($true) {
+              Write-Host "[$(Get-Date)] Windows VPS running..."
+              Start-Sleep -Seconds 300
+          }
