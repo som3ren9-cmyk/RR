@@ -15,38 +15,44 @@ jobs:
           authkey: ${{ secrets.TAILSCALE_AUTH_KEY }}
           args: --ssh --hostname=woobbie-${{ github.run_id }}
 
-      - name: Launch Pure Debian 12 Environment
+      - name: Setup SSH Password and Environment
         run: |
-          # Start a Debian 12 (Bookworm) container named woobbie
-          docker run -d --name woobbie --privileged --net=host debian:bookworm sleep infinity
+          # Set password for runner and root
+          echo "runner:Admin@1234" | sudo chpasswd
+          echo "root:Admin@1234" | sudo chpasswd
 
-          # Install base system utilities inside woobbie
+          # Enable SSH password authentication for WinSCP
+          sudo sed -i 's/^#\?PasswordAuthentication .*/PasswordAuthentication yes/' /etc/ssh/sshd_config
+          sudo sed -i 's/^#\?KbdInteractiveAuthentication .*/KbdInteractiveAuthentication yes/' /etc/ssh/sshd_config
+          sudo systemctl restart ssh
+
+          # Launch Debian 12 with a shared workspace linked to runner home
+          mkdir -p /home/runner/workspace
+          sudo chown -R runner:runner /home/runner/workspace
+          docker run -d --name woobbie --privileged --net=host -v /home/runner/workspace:/workspace debian:bookworm sleep infinity
+
+          # Install packages inside Debian
           docker exec woobbie apt-get update
           docker exec woobbie apt-get install -y curl wget sudo nano htop git
 
-          # Redirect incoming SSH sessions directly into the woobbie environment
-          echo '#!/bin/bash' | sudo tee /usr/local/bin/enter-woobbie
-          echo 'exec docker exec -it woobbie bash' | sudo tee -a /usr/local/bin/enter-woobbie
-          sudo chmod +x /usr/local/bin/enter-woobbie
-          sudo chsh -s /usr/local/bin/enter-woobbie runner
+          # Add shortcut command 'debian' to jump into Debian shell
+          echo "alias debian='docker exec -it woobbie bash'" >> /home/runner/.bashrc
 
       - name: Display Connection Details and Keep Alive
         run: |
           TS_IP=$(tailscale ip -4)
           echo "======================================================"
-          echo "Server 'woobbie' is active."
+          echo "Server 'woobbie' is ready for WinSCP and SSH."
           echo "Tailscale IP : $TS_IP"
-          echo "Hostname     : woobbie-${{ github.run_id }}"
-          echo "User         : runner"
+          echo "Username     : runner"
+          echo "Password     : Admin@1234"
+          echo "Port         : 22"
           echo ""
-          echo "Connect from your terminal using:"
-          echo "ssh runner@$TS_IP"
-          echo "or:"
-          echo "ssh runner@woobbie-${{ github.run_id }}"
+          echo "Shared folder for WinSCP files: /home/runner/workspace"
           echo "======================================================"
 
           # Keep the session running
           while [ true ]; do
-            echo "[$(date)] woobbie is running active..."
+            echo "[$(date)] woobbie running active..."
             sleep 300
           done
