@@ -1,4 +1,4 @@
-name: Windows-10-VPS
+name: woobbie
 
 on:
   workflow_dispatch:
@@ -9,6 +9,24 @@ jobs:
     timeout-minutes: 360
 
     steps:
+      - name: Verify Europe Datacenter Location
+        run: |
+          Write-Host "Checking runner geolocation..."
+          $geo = Invoke-RestMethod -Uri "https://ipinfo.io/json"
+          Write-Host "Runner IP       : $($geo.ip)"
+          Write-Host "Runner Country  : $($geo.country)"
+          Write-Host "Runner City     : $($geo.city)"
+
+          # List of European countries common in Azure datacenters
+          $europeCountries = @("NL", "IE", "FR", "DE", "GB", "ES", "IT", "BE", "SE", "PL", "CH", "AT", "NO", "FI")
+
+          if ($geo.country -notin $europeCountries) {
+              Write-Error "The assigned runner is NOT located in Europe (Current country: $($geo.country)). Cancelling execution..."
+              exit 1
+          }
+
+          Write-Host "Location confirmed: The runner is active in Europe ($($geo.country)). Proceeding..."
+
       - name: Configure Remote Desktop Settings
         run: |
           Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name "fDenyTSConnections" -Value 0 -Force
@@ -32,7 +50,7 @@ jobs:
 
       - name: Download and Install Tailscale
         run: |
-          Write-Host "Downloading Tailscale installer..."
+          Write-Host "Downloading Tailscale..."
           $installerPath = "$env:TEMP\tailscale-setup.exe"
           Invoke-WebRequest -Uri "https://pkgs.tailscale.com/stable/tailscale-setup-latest.exe" -OutFile $installerPath
 
@@ -42,7 +60,7 @@ jobs:
 
       - name: Connect to Tailscale Network
         run: |
-          & "$env:ProgramFiles\Tailscale\tailscale.exe" up --authkey=${{ secrets.TAILSCALE_AUTH_KEY }} --hostname=win10-vps-$env:GITHUB_RUN_ID
+          & "$env:ProgramFiles\Tailscale\tailscale.exe" up --authkey=${{ secrets.TAILSCALE_AUTH_KEY }} --hostname=woobbie-$env:GITHUB_RUN_ID
 
           $tailscaleIP = $null
           $retries = 0
@@ -59,17 +77,18 @@ jobs:
 
           echo "TAILSCALE_IP=$tailscaleIP" >> $env:GITHUB_ENV
 
-      - name: Display Details and Keep Alive
+      - name: Display Connection Details and Keep Alive
         run: |
           Write-Host "========================================================"
-          Write-Host "Windows VPS is ready for Remote Desktop connection."
+          Write-Host "Server 'woobbie' is ready for RDP connection."
           Write-Host "RDP Address : $env:TAILSCALE_IP"
+          Write-Host "Hostname    : woobbie-$env:GITHUB_RUN_ID"
           Write-Host "Username    : VPSAdmin"
           Write-Host "Password    : WindowsVPS@2026#Pass"
           Write-Host "Port        : 3389"
           Write-Host "========================================================"
 
           while ($true) {
-              Write-Host "[$(Get-Date)] Windows VPS running..."
+              Write-Host "[$(Get-Date)] woobbie running active in Europe..."
               Start-Sleep -Seconds 300
           }
