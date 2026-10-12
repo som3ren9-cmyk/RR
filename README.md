@@ -75,9 +75,4 @@ Once the workflow finishes initializing, expand the connection step in the workf
 4. Log in using the credentials defined in the script:
    - **Default User:** `VPSAdmin`
    - **Default Password:** `WindowsVPS@2026#Pass`
-
-### Option B: Linux / Ubuntu (SSH)
-1. Open your local terminal / command prompt (with Tailscale active).
-2. Connect via SSH:
-   ```bash
-   ssh runner@<TAILSCALE_IP>
+---
