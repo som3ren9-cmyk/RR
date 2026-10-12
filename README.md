@@ -1,6 +1,6 @@
 # Cloud VM Runner via GitHub Actions & Tailscale
 
-This repository provides automated GitHub Actions workflows to provision a temporary remote environment (Windows with Remote Desktop / Ubuntu with SSH) accessible securely via [Tailscale](https://tailscale.com/).
+This repository provides automated GitHub Actions workflows to provision a temporary remote environment (Windows with Remote Desktop accessible securely via [Tailscale](https://tailscale.com/).
 
 >  **Disclaimer:** This project is intended for educational, testing, and CI/CD debugging purposes only. Ensure your use complies with the [GitHub Acceptable Use Policies](https://docs.github.com/en/site-policy/acceptable-use-policies/github-acceptable-use-policies).
 
@@ -67,8 +67,6 @@ Commit and push your changes to the `main` branch.
 ## How to Connect
 
 Once the workflow finishes initializing, expand the connection step in the workflow logs:
-
-### Option A: Windows (RDP)
 1. Open **Remote Desktop Connection** (`mstsc` on Windows) on your local machine.
 2. Make sure your local Tailscale application is connected.
 3. Enter the **Tailscale IP address** shown in the workflow logs.
